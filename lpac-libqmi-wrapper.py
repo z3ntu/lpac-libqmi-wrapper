@@ -72,7 +72,7 @@ def main():
             except json.decoder.JSONDecodeError:
                 print("Failed to decode JSON:")
                 print(line)
-                break
+                continue
 
             req_type = req["type"]
             if req_type == "lpa":
