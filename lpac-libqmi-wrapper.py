@@ -4,12 +4,12 @@ import os
 import json
 import subprocess
 import sys
-from subprocess import Popen, PIPE
 from pprint import pprint
 
-def run_apdu(data):
+def send_apdu(data):
     # Run against slot 2, logical channel 2
-    # FIXME: This channel should be opened and closed by this wrapper
+    # FIXME: This channel should be opened and closed in their functions and the value used here
+    # Not quite sure how to handle slot id, could have this as extra parameter for this script
     output = (
         subprocess.check_output(
             [
@@ -27,66 +27,70 @@ def run_apdu(data):
     return output
 
 
-def handle_func(func, param):
-    #print(f"INFO: func={func} param={param}")
+def handle_type_apdu(func, param):
     if func == "connect":
         # Nothing to do
         print("INFO: Connect")
         return {"ecode": 0}
+    if func == "disconnect":
+        # Nothing to do
+        print("INFO: Disconnect")
+        return {"ecode": 0}
     if func == "logic_channel_open":
         # FIXME Open channel
         print(f"INFO: Open channel with AID {param}")
-        # TODO: Return value seems to be channel ID
-        return {"ecode": 0}
-    if func == "transmit":
-        ret_data = run_apdu(param)
-        #print("Returning APDU data: " + ret_data)
-        return {"ecode": 0, "data": ret_data}
+        return {"ecode": 0} # TODO: Return value seems to be channel ID
     if func == "logic_channel_close":
         # FIXME Close channel
         print(f"INFO: Close channel {param}")
         return {"ecode": 0}
+    if func == "transmit":
+        data = send_apdu(param)
+        return {"ecode": 0, "data": data}
 
     raise RuntimeError(f"Unhandled func {func}")
 
-def handle_request(data):
-    if data["type"] == "lpa":
-        print("INFO: Received LPA data. Printing...")
-        pprint(data)
-        return None
-    if data["type"] != "apdu":
-        raise RuntimeError("Unknown type")
-    payload = data["payload"]
-
-    ret_payload = handle_func(payload["func"], payload["param"])
-    return {"type": "apdu", "payload": ret_payload}
 
 def main():
     env = os.environ.copy()
-    env["APDU_INTERFACE"]="libapduinterface_stdio.so"
+    env["APDU_INTERFACE"] = "libapduinterface_stdio.so"
 
     cmd = ['./lpac/build/output/lpac'] + sys.argv[1:]
-    p = Popen(cmd, stdout=PIPE, stdin=PIPE, stderr=subprocess.DEVNULL, env=env, text=True)
-    while p.poll() is None:
-        #print("INFO: waiting for data...")
-        line = p.stdout.readline()
-        if not line:
-            continue
+    with subprocess.Popen(cmd,
+                          stdout=subprocess.PIPE,
+                          stdin=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL,
+                          env=env,
+                          text=True) as proc:
+        while proc.poll() is None:
+            # Read a line from lpac
+            line = proc.stdout.readline()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except json.decoder.JSONDecodeError:
+                print("Failed to decode JSON:")
+                print(line)
+                break
 
-        try:
-            obj = json.loads(line)
-        except json.decoder.JSONDecodeError:
-            print("Failed to decode JSON:")
-            print(line)
-            sys.exit(1)
+            req_type = req["type"]
+            if req_type == "lpa":
+                print("INFO: Received LPA data. Printing...")
+                pprint(req)
+                continue
+            if req_type == "apdu":
+                payload = handle_type_apdu(req["payload"]["func"], req["payload"]["param"])
+                resp = {"type": "apdu", "payload": payload}
+            else:
+                raise RuntimeError(f"Unknown request type {req_type}")
 
-        #print("INFO: Got data: " + str(obj))
+            # Send a line to lpac
+            proc.stdin.write(json.dumps(resp) + "\n")
+            proc.stdin.flush()
 
-        #resp = {"type": "apdu", "payload": {"ecode": 0}}
-        resp = handle_request(obj)
-        #print("INFO: Sending response: " + json.dumps(resp))
-        p.stdin.write(json.dumps(resp) + "\n")
-        p.stdin.flush()
+        print(f"Exit code: {proc.returncode}")
+
 
 if __name__ == '__main__':
     main()
