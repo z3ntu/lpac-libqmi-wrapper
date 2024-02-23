@@ -28,26 +28,30 @@ def run_apdu(data):
 
 
 def handle_func(func, param):
-    print(f"INFO: func={func} param={param}")
+    #print(f"INFO: func={func} param={param}")
     if func == "connect":
+        # Nothing to do
+        print("INFO: Connect")
         return {"ecode": 0}
     if func == "logic_channel_open":
         # FIXME Open channel
         print(f"INFO: Open channel with AID {param}")
-        # TODO: Not sure what return value should be, seems to be channel id, but I think different one?
-        return {"ecode": 1}
+        # TODO: Return value seems to be channel ID
+        return {"ecode": 0}
     if func == "transmit":
         ret_data = run_apdu(param)
-        print("Returning APDU data: " + ret_data)
+        #print("Returning APDU data: " + ret_data)
         return {"ecode": 0, "data": ret_data}
     if func == "logic_channel_close":
         # FIXME Close channel
+        print(f"INFO: Close channel {param}")
         return {"ecode": 0}
 
     raise RuntimeError(f"Unhandled func {func}")
 
 def handle_request(data):
     if data["type"] == "lpa":
+        print("INFO: Received LPA data. Printing...")
         pprint(data)
         return None
     if data["type"] != "apdu":
