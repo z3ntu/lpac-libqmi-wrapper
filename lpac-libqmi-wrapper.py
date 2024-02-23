@@ -10,21 +10,30 @@ def send_apdu(data):
     # Run against slot 2, logical channel 2
     # FIXME: This channel should be opened and closed in their functions and the value used here
     # Not quite sure how to handle slot id, could have this as extra parameter for this script
-    output = (
-        subprocess.check_output(
-            [
-                "./libqmi/builddir/src/qmicli/qmicli",
-                "-d", "qrtr://0",
-                "--uim-send-apdu=2,2," + data
-            ],
-            stderr=subprocess.STDOUT,
+    try:
+        output = (
+            subprocess.check_output(
+                [
+                    "./libqmi/builddir/src/qmicli/qmicli",
+                    "-d", "qrtr://0",
+                    "--uim-send-apdu=2,2," + data
+                ],
+                stderr=subprocess.STDOUT,
+            )
+            .decode('utf-8')
+            .strip()
+            .replace("Send APDU operation successfully completed: ", "")
+            .replace(" ", "")
         )
-        .decode('utf-8')
-        .strip()
-        .replace("Send APDU operation successfully completed: ", "")
-        .replace(" ", "")
-    )
-    return output
+        return output
+    except subprocess.CalledProcessError as ex:
+        print("+++ LIBQMI EXCEPTION! +++")
+        if ex.output:
+            print(ex.output.decode('utf-8'))
+        if ex.stderr:
+            print(ex.stderr.decode('utf-8'))
+        print(ex)
+        sys.exit(1)
 
 
 def handle_type_apdu(func, param):
