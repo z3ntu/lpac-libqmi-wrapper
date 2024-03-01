@@ -24,7 +24,7 @@ def run_qmicli(command: str) -> str:
         output = (
             subprocess.check_output(
                 [
-                    "./libqmi/builddir/src/qmicli/qmicli",
+                    "qmicli",
                     "-d", "qrtr://0",
                     command
                 ],
@@ -109,7 +109,7 @@ def main():
     env = os.environ.copy()
     env["APDU_INTERFACE"] = "libapduinterface_stdio.so"
 
-    cmd = ['./lpac/build/output/lpac'] + sys.argv[1:]
+    cmd = ['lpac'] + sys.argv[1:]
     with subprocess.Popen(cmd,
                           stdout=subprocess.PIPE,
                           stdin=subprocess.PIPE,
