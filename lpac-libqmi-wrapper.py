@@ -12,7 +12,11 @@ from typing import Optional
 SLOT = 2
 
 # apdu request doesn't provide us the channel_id again, so we need to persist it
-channel_id: Optional[int] = None
+CHANNEL_ID: Optional[int] = None
+
+
+class QmicliException(Exception):
+    pass
 
 
 def run_qmicli(command: str) -> str:
@@ -37,12 +41,13 @@ def run_qmicli(command: str) -> str:
         if ex.stderr:
             print(ex.stderr.decode('utf-8'))
         print(ex)
-        sys.exit(1)
+        print("+++ LIBQMI EXCEPTION! +++")
+        raise QmicliException(ex) from ex
 
 
 def send_apdu(apdu: str) -> str:
     return (
-        run_qmicli(f"--uim-send-apdu={SLOT},{channel_id},{apdu}")
+        run_qmicli(f"--uim-send-apdu={SLOT},{CHANNEL_ID},{apdu}")
         .replace("Send APDU operation successfully completed: ", "")
         .replace(" ", "")
     )
@@ -65,23 +70,37 @@ def handle_type_apdu(func: str, param: str):
         # Nothing to do
         print("INFO: Connect")
         return {"ecode": 0}
+
     if func == "disconnect":
         # Nothing to do
         print("INFO: Disconnect")
         return {"ecode": 0}
+
     if func == "logic_channel_open":
         print(f"INFO: Open channel with AID {param}")
-        # We need to persist the channel ID for send_apdu
-        global channel_id
-        channel_id = open_channel(param)
-        return {"ecode": channel_id}
+        try:
+            channel_id = open_channel(param)
+            # We need to persist the channel ID for send_apdu
+            global CHANNEL_ID
+            CHANNEL_ID = channel_id
+            return {"ecode": channel_id}
+        except QmicliException:
+            return {"ecode": "-1"}
+
     if func == "logic_channel_close":
-        print(f"INFO: Close channel {param}")
-        close_channel(int(param))
-        return {"ecode": 0}
+        try:
+            print(f"INFO: Close channel {param}")
+            close_channel(int(param))
+            return {"ecode": 0}
+        except QmicliException:
+            return {"ecode": "-1"}
+
     if func == "transmit":
-        data = send_apdu(param)
-        return {"ecode": 0, "data": data}
+        try:
+            data = send_apdu(param)
+            return {"ecode": 0, "data": data}
+        except QmicliException:
+            return {"ecode": "-1"}
 
     raise RuntimeError(f"Unhandled func {func}")
 
