@@ -5,25 +5,29 @@ import json
 import subprocess
 import sys
 from pprint import pprint
+from typing import Optional
 
-def send_apdu(data):
-    # Run against slot 2, logical channel 2
-    # FIXME: This channel should be opened and closed in their functions and the value used here
-    # Not quite sure how to handle slot id, could have this as extra parameter for this script
+# Run against slot 2 (normally the eEUICC slot)
+# TODO: Allow running against other slot also
+SLOT = 2
+
+# apdu request doesn't provide us the channel_id again, so we need to persist it
+channel_id: Optional[int] = None
+
+
+def run_qmicli(command: str) -> str:
     try:
         output = (
             subprocess.check_output(
                 [
                     "./libqmi/builddir/src/qmicli/qmicli",
                     "-d", "qrtr://0",
-                    "--uim-send-apdu=2,2," + data
+                    command
                 ],
                 stderr=subprocess.STDOUT,
             )
             .decode('utf-8')
             .strip()
-            .replace("Send APDU operation successfully completed: ", "")
-            .replace(" ", "")
         )
         return output
     except subprocess.CalledProcessError as ex:
@@ -36,7 +40,27 @@ def send_apdu(data):
         sys.exit(1)
 
 
-def handle_type_apdu(func, param):
+def send_apdu(apdu: str) -> str:
+    return (
+        run_qmicli(f"--uim-send-apdu={SLOT},{channel_id},{apdu}")
+        .replace("Send APDU operation successfully completed: ", "")
+        .replace(" ", "")
+    )
+
+
+def open_channel(aid: str) -> int:
+    channel_id = (
+        run_qmicli(f"--uim-open-logical-channel={SLOT},{aid}")
+        .replace("Open Logical Channel operation successfully completed: ", "")
+    )
+    return int(channel_id)
+
+
+def close_channel(channel_id: int) -> None:
+    run_qmicli(f"--uim-close-logical-channel={SLOT},{channel_id}")
+
+
+def handle_type_apdu(func: str, param: str):
     if func == "connect":
         # Nothing to do
         print("INFO: Connect")
@@ -46,12 +70,14 @@ def handle_type_apdu(func, param):
         print("INFO: Disconnect")
         return {"ecode": 0}
     if func == "logic_channel_open":
-        # FIXME Open channel
         print(f"INFO: Open channel with AID {param}")
-        return {"ecode": 0} # TODO: Return value seems to be channel ID
+        # We need to persist the channel ID for send_apdu
+        global channel_id
+        channel_id = open_channel(param)
+        return {"ecode": channel_id}
     if func == "logic_channel_close":
-        # FIXME Close channel
         print(f"INFO: Close channel {param}")
+        close_channel(int(param))
         return {"ecode": 0}
     if func == "transmit":
         data = send_apdu(param)
