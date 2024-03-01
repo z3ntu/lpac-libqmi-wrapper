@@ -133,15 +133,21 @@ def main():
                 print("INFO: Received LPA data. Printing...")
                 pprint(req)
                 continue
+
+            if req_type == "progress":
+                print("INFO: Received progress. Printing...")
+                pprint(req)
+                continue
+
             if req_type == "apdu":
                 payload = handle_type_apdu(req["payload"]["func"], req["payload"]["param"])
                 resp = {"type": "apdu", "payload": payload}
-            else:
-                raise RuntimeError(f"Unknown request type {req_type}")
+                # Send a line to lpac
+                proc.stdin.write(json.dumps(resp) + "\n")
+                proc.stdin.flush()
+                continue
 
-            # Send a line to lpac
-            proc.stdin.write(json.dumps(resp) + "\n")
-            proc.stdin.flush()
+            raise RuntimeError(f"Unknown request type {req_type}")
 
         print(f"Exit code: {proc.returncode}")
 
