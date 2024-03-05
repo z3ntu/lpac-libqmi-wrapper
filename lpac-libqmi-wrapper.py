@@ -51,7 +51,7 @@ def send_apdu(apdu: str) -> str:
     return (
         run_qmicli(f"--uim-send-apdu={SLOT},{CHANNEL_ID},{apdu}")
         .replace("Send APDU operation successfully completed: ", "")
-        .replace(" ", "")
+        .replace(":", "")
     )
 
 
