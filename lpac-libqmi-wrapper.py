@@ -7,6 +7,8 @@ import sys
 from pprint import pprint
 from typing import Optional
 
+DEBUG = False
+
 # Run against slot 2 (normally the eEUICC slot)
 # TODO: Allow running against other slot also
 SLOT = 2
@@ -97,7 +99,11 @@ def handle_type_apdu(func: str, param: str):
 
     if func == "transmit":
         try:
+            if DEBUG:
+                print(f"Send APDU: {param}")
             data = send_apdu(param)
+            if DEBUG:
+                print(f"Recv APDU: {data}")
             return {"ecode": 0, "data": data}
         except QmicliException:
             return {"ecode": "-1"}
@@ -106,6 +112,10 @@ def handle_type_apdu(func: str, param: str):
 
 
 def main():
+    if os.environ.get("DEBUG") == "1":
+        global DEBUG
+        DEBUG = 1
+
     env = os.environ.copy()
     env["APDU_INTERFACE"] = "libapduinterface_stdio.so"
 
@@ -118,7 +128,9 @@ def main():
                           text=True) as proc:
         while proc.poll() is None:
             # Read a line from lpac
-            line = proc.stdout.readline()
+            line = proc.stdout.readline().strip()
+            if DEBUG:
+                print(f"recv={line}")
             if not line:
                 continue
             try:
@@ -143,6 +155,8 @@ def main():
                 payload = handle_type_apdu(req["payload"]["func"], req["payload"]["param"])
                 resp = {"type": "apdu", "payload": payload}
                 # Send a line to lpac
+                if DEBUG:
+                    print(f"send={json.dumps(resp)}")
                 proc.stdin.write(json.dumps(resp) + "\n")
                 proc.stdin.flush()
                 continue
