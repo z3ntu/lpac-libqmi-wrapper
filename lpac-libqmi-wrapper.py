@@ -117,7 +117,8 @@ def main():
         DEBUG = 1
 
     env = os.environ.copy()
-    env["APDU_INTERFACE"] = "libapduinterface_stdio.so"
+    env["APDU_INTERFACE"] = "libapduinterface_stdio.so" # lpac v1.x, can be removed at some point
+    env["LPAC_APDU"] = "stdio" # lpac v2.x
 
     cmd = ['lpac'] + sys.argv[1:]
     with subprocess.Popen(cmd,
