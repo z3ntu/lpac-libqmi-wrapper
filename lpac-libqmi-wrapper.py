@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# SPDX-FileCopyrightText: 2024 Luca Weiss
+# SPDX-License-Identifier: MIT
 
 import os
 import json
